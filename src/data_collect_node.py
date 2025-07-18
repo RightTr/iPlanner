@@ -142,7 +142,7 @@ class DataCollector:
                 cv2.imwrite(file_name_camera, self.__cv2_img_cam)
                 o3d.io.write_point_cloud(file_name_scan, self.__pcd)
                 time_step = time_step + 1
-                print("save current idx: %d", time_step)
+                print(f"save current idx: {time_step}")
                 last_odom = self.__odom_list.copy()
             r.sleep()
             
