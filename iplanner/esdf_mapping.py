@@ -26,15 +26,19 @@ class CloudUtils:
         return pcd
 
     @staticmethod
-    def extract_cloud_from_image(P_matrix, im, T, min_dist=0.2, max_dist=50, scale=1000.0):
-        p_inv = np.linalg.inv(P_matrix)
+    def extract_cloud_from_image(E, K, im, T, min_dist=0.2, max_dist=50, scale=1000.0):
+        e_inv = np.linalg.inv(E)
+        k_inv = np.linalg.inv(K)
         im = im / scale
         im[im<min_dist] = 1e-3
         im[im>max_dist] = 1e-3
 
         T_z = np.concatenate((T, np.expand_dims(1.0/im, axis=0)), axis=0).reshape(4, -1)
-        P = np.multiply(im.reshape(1, -1), p_inv.dot(T_z)).T[:,:3]
-        return P
+        P = np.multiply(im.reshape(1, -1), k_inv.dot(T_z)).T[:,:3]
+        P = P[:, [2, 0, 1]]
+        P[:, 1:] *= -1
+        P_homo = np.concatenate([P, np.ones((P.shape[0], 1))], axis=1)
+        return (e_inv @ P_homo.T).T[:, :3]
 
 class CameraUtils:
     @staticmethod
@@ -325,6 +329,8 @@ class DepthReconstruction:
         self.odom_list, self._avg_height = DataUtils.read_odom_list(self.input_path + "/odom_ground_truth.txt")
         
         N = len(self.odom_list)
+        # self.start_id = 40
+        # self.end_id = 45
         self.start_id = 0 if self.is_max_iter else start_id
         self.end_id = N if self.is_max_iter else min(start_id + iters, N)
         
@@ -347,11 +353,10 @@ class DepthReconstruction:
             if is_flat_ground:
                 odom[2] = self._avg_height
             E = CameraUtils.compute_e_matrix(odom, is_flat_ground, self.cameraR, self.cameraT)
-            P_matrix = self.K.dot(E)
             if is_output:
                 print("Extracting points from image: ", idx + self.start_id)
             self.points[idx * pixel_nums: (idx + 1) * pixel_nums, :] = CloudUtils.extract_cloud_from_image(
-                P_matrix, im, T, max_dist=self.max_range)
+                E, self.K, im, T, max_dist=self.max_range)
 
         print("creating open3d geometry point cloud...")
         self.pcd = CloudUtils.create_open3d_cloud(self.points, self.voxel_size)
@@ -361,7 +366,8 @@ class DepthReconstruction:
     def show_point_cloud(self):
         if not self.is_constructed:
             print("no reconstructed cloud")
-        o3d.visualization.draw_geometries([self.pcd])  # visualize point cloud
+        coord_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0, origin=[0, 0, 0])
+        o3d.visualization.draw_geometries([self.pcd, coord_frame])
         
     def save_reconstructed_data(self, image_type="depth"):
         if not self.is_constructed:

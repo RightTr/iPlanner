@@ -16,7 +16,7 @@ if __name__ == '__main__':
     
     root_folder = os.getenv('EXPERIMENT_DIRECTORY', os.getcwd())
     # Load parameters from json file
-    with open(os.path.join(os.path.dirname(root_folder), 'config', 'data_generation.json')) as json_file:
+    with open(os.path.join(os.path.dirname(root_folder), 'config', 'go_data_generation.json')) as json_file:
         parameters = json.load(json_file)
     
     folder_name = parameters.get('folder_name', "CollectedData")
