@@ -64,7 +64,7 @@ class PlannerNetTrainer:
         )
 
     def load_config(self):
-        with open(os.path.join(os.path.dirname(self.root_folder), 'config', 'training_config.json')) as json_file:
+        with open(os.path.join(os.path.dirname(self.root_folder), 'config', 'go_training_config.json')) as json_file:
             self.config = json.load(json_file)
 
     def prepare_model(self):

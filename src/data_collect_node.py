@@ -47,15 +47,14 @@ class DataCollector:
         self.__cv2_img_cam   = np.ndarray([640, 360])
         self.__odom_list = []
         self.__pcd = o3d.geometry.PointCloud()
-        self.__init_check_dics = {"color": 0, "depth": 0, "scan_extrinsic": 0, "camera_extrinsic": 0, "odometry_extrinsic": 0}
+        self.__init_check_dics = {"color": 0, "depth": 0, "camera_extrinsic": 0, "odometry_extrinsic": 0}
 
         depth_sub = message_filters.Subscriber(self.__depth_topic, Image)
         image_sub = message_filters.Subscriber(self.__color_topic, Image)
         odom_sub  = message_filters.Subscriber(self.__odom_topic,  Odometry)
-        scan_sub  = message_filters.Subscriber(self.__scan_topic,  PointCloud2)
 
         time_sync_thred = 0.01 # second 
-        ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub, scan_sub, odom_sub], 50, time_sync_thred)
+        ts = message_filters.ApproximateTimeSynchronizer([image_sub, depth_sub, odom_sub], 50, time_sync_thred)
         ts.registerCallback(self.__syncCallback)
 
         # camera info subscriber
@@ -63,7 +62,7 @@ class DataCollector:
         rospy.Subscriber(self.__color_info_topic, CameraInfo, self.__colorInfoCallback, (self.__color_intrinc_path))
 
         print("deleting previous files, if any ...")
-        folder_list = ["depth", "camera", "scan"]
+        folder_list = ["depth", "camera"]
         for folder_name in folder_list:
             dir_path = os.path.join(*[self.__root_path, folder_name])
             if not os.path.exists(dir_path):
@@ -81,18 +80,15 @@ class DataCollector:
         self.__depth_topic       = args.depth_topic
         self.__color_topic       = args.color_topic
         self.__odom_topic        = args.odom_topic
-        self.__scan_topic        = args.scan_topic
         self.__depth_info_topic  = args.depth_info_topic
         self.__color_info_topic  = args.color_info_topic
         self.__camera_frame_id   = args.camera_frame_id
-        self.__scan_frame_id     = args.scan_frame_id
         self.__base_frame_id     = args.base_frame_id
         self.__odom_associate_id = args.odom_associate_id
 
         self.__depth_intrinc_path  = os.path.join(self.__root_path, "depth_intrinsic.txt")
         self.__color_intrinc_path  = os.path.join(self.__root_path, "color_intrinsic.txt")
         self.__camera_extrinc_path = os.path.join(self.__root_path, "camera_extrinsic.txt")
-        self.__scan_extrinc_path   = os.path.join(self.__root_path, "scan_extrinsic.txt")
         # print(self.__depth_intrinc_path)
         return
 
@@ -109,12 +105,6 @@ class DataCollector:
                     self.__writeExtrinstic(pos, ori, self.__camera_extrinc_path, "camera_extrinsic")
                 except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     print("Wait to get camera extrinsic.")
-            if (self.__init_check_dics["scan_extrinsic"] == 0):
-                try:
-                    (pos, ori) = self.__tf_listener.lookupTransform(self.__base_frame_id, self.__scan_frame_id, rospy.Time(0))
-                    self.__writeExtrinstic(pos, ori, self.__scan_extrinc_path, "scan_extrinsic")
-                except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    print("Wait to get scan extrinsic.")
             # listen to odom extrinsic
             if (self.__init_check_dics["odometry_extrinsic"] == 0):
                 try:
@@ -137,10 +127,8 @@ class DataCollector:
                 odom_file.write('\n')
                 file_name_depth  = os.path.join(*[self.__root_path, "depth",  str(time_step) + ".png"])
                 file_name_camera = os.path.join(*[self.__root_path, "camera", str(time_step) + ".png"])
-                file_name_scan   = os.path.join(*[self.__root_path, "scan",   str(time_step) + ".ply"])
                 self.__saveDepthImage(file_name_depth, self.__cv2_img_depth)
                 cv2.imwrite(file_name_camera, self.__cv2_img_cam)
-                o3d.io.write_point_cloud(file_name_scan, self.__pcd)
                 time_step = time_step + 1
                 print(f"save current idx: {time_step}")
                 last_odom = self.__odom_list.copy()
@@ -150,12 +138,11 @@ class DataCollector:
         rospy.spin()
         return
 
-    def __syncCallback(self, image, depth, scan, odom):
+    def __syncCallback(self, image, depth, odom):
         if self.__init_check_dics["odometry_extrinsic"] == 0:
             return
         self.__cv2_img_cam = ros_numpy.numpify(image)
         self.__cv2_img_depth = ros_numpy.numpify(depth)
-        self.__updateScanPoints(scan, self.__pcd)
         
         self.__cv2_img_depth[~np.isfinite(self.__cv2_img_depth)] = 0.0
 
@@ -236,12 +223,10 @@ if __name__ == '__main__':
     parser.add_argument('depth_topic',       type=str,   default='/rgbd_camera/depth/image',       help="Topic for depth image.")
     parser.add_argument('color_topic',       type=str,   default='/rgbd_camera/color/image',       help="Topic for color image.")
     parser.add_argument('odom_topic',        type=str,   default='/state_estimation',              help='Topic for odometry data.')
-    parser.add_argument('scan_topic',        type=str,   default='/velodyne_points',               help='Topic for lidar point cloud data.')
     parser.add_argument('env_name',          type=str,   default='empty',                          help='Name of the environment, also used as the folder name for data.')
     parser.add_argument('depth_info_topic',  type=str,   default='/rgbd_camera/depth/camera_info', help='Topic for depth camera information.')
     parser.add_argument('color_info_topic',  type=str,   default='/rgbd_camera/color/camera_info', help='Topic for color camera information.')
     parser.add_argument('camera_frame_id',   type=str,   default='camera',                         help='Frame ID for the camera.')
-    parser.add_argument('scan_frame_id',     type=str,   default='sensor',                         help='Frame ID for the lidar sensor.')
     parser.add_argument('base_frame_id',     type=str,   default='vehicle',                        help='Base frame ID.')
     parser.add_argument('odom_associate_id', type=str,   default='vehicle',                        help='Frame ID associated with odometry data.')
 

@@ -1,0 +1,15 @@
+# images and odom topics
+main_freq:              2.5
+depth_topic:            /camera/depth/image_raw
+color_topic:            /camera/color/image_raw
+odom_topic:             /b2_odom_hf
+
+# camaera info topics
+depth_info_topic:       /camera/depth/camera_info
+color_info_topic:       /camera/color/camera_info
+camera_frame_id:        camera_link
+base_frame_id:          base_link
+odom_associate_id:      base_link
+
+# environment name
+env_name:               go_env
