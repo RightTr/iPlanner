@@ -52,7 +52,7 @@ class CameraUtils:
     @staticmethod
     def compute_e_matrix(odom, odom0, is_flat_ground, cameraR, cameraT):
         Rc = R.from_quat(odom[3:])
-        odom[2] = 0.5
+        odom[2] = 0.5 # Fix the robot's height, because sometimes the odometry z value increases abnormally
         if is_flat_ground:
             euler = Rc.as_euler('xyz', degrees=False)
             euler[1] = 0.0
@@ -330,10 +330,10 @@ class DepthReconstruction:
         self.odom_list, self._avg_height = DataUtils.read_odom_list(self.input_path + "/odom_ground_truth.txt")
         
         N = len(self.odom_list)
-        self.start_id = 500
-        # self.start_id = 0 if self.is_max_iter else start_id
-        # self.end_id = N if self.is_max_iter else min(start_id + iters, N)
-        self.end_id = 750
+        # self.start_id = 500
+        self.start_id = 0 if self.is_max_iter else start_id
+        self.end_id = N if self.is_max_iter else min(start_id + iters, N)
+        # self.end_id = 750
         
         self.is_constructed = False
         print("Ready to read depth data.")
